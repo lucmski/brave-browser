@@ -9,7 +9,7 @@ pipeline {
         string(name: "BRANCH", defaultValue: "master", description: "")
         choice(name: "CHANNEL", choices: ["nightly", "dev", "beta", "release"], description: "")
         booleanParam(name: "WIPE_WORKSPACE", defaultValue: false, description: "")
-        booleanParam(name: "RUN_INIT", defaultValue: false, description: "")
+        booleanParam(name: "SKIP_INIT", defaultValue: false, description: "")
         booleanParam(name: "DISABLE_SCCACHE", defaultValue: false, description: "")
         // TODO: add SKIP_SIGNING
         booleanParam(name: "DEBUG", defaultValue: false, description: "")
@@ -28,7 +28,7 @@ pipeline {
                     CHANNEL = params.CHANNEL
                     CHANNEL_CAPITALIZED = CHANNEL.capitalize()
                     WIPE_WORKSPACE = params.WIPE_WORKSPACE
-                    RUN_INIT = params.RUN_INIT
+                    SKIP_INIT = params.SKIP_INIT
                     DISABLE_SCCACHE = params.DISABLE_SCCACHE
                     DEBUG = params.DEBUG
                     BUILD_TYPE = "Release"
@@ -70,7 +70,7 @@ pipeline {
             }
             parallel {
                 stage("android") {
-                    agent { label "linux-${RELEASE_TYPE}" }
+                    agent { label "android-${RELEASE_TYPE}" }
                     environment {
                         GIT_CACHE_PATH = "${HOME}/cache"
                         SCCACHE_BUCKET = credentials("brave-browser-sccache-android-s3-bucket")
@@ -106,15 +106,10 @@ pipeline {
                         }
                         stage("init") {
                             when {
-                                expression { return !fileExists("src/brave/package.json") || RUN_INIT }
+                                expression { !SKIP_INIT }
                             }
                             steps {
                                 sh "npm run init -- --target_os=android"
-                            }
-                        }
-                        stage("sync") {
-                            steps {
-                                sh "npm run sync -- --all --target_os=android"
                             }
                         }
                         stage("lint") {
@@ -208,15 +203,10 @@ pipeline {
                         }
                         stage("init") {
                             when {
-                                expression { return !fileExists("src/brave/package.json") || RUN_INIT }
+                                expression { !SKIP_INIT }
                             }
                             steps {
                                 sh "npm run init"
-                            }
-                        }
-                        stage("sync") {
-                            steps {
-                                sh "npm run sync -- --all"
                             }
                         }
                         stage("lint") {
@@ -360,15 +350,10 @@ pipeline {
                         }
                         stage("init") {
                             when {
-                                expression { return !fileExists("src/brave/package.json") || RUN_INIT }
+                                expression { !SKIP_INIT }
                             }
                             steps {
                                 sh "npm run init"
-                            }
-                        }
-                        stage("sync") {
-                            steps {
-                                sh "npm run sync -- --all"
                             }
                         }
                         stage("lint") {
@@ -535,20 +520,16 @@ pipeline {
                         stage("install") {
                             steps {
                                 powershell "npm install --no-optional"
-                                powershell "Remove-Item ${GIT_CACHE_PATH}/*.lock"
+                                powershell "Remove-Item -Recurse -Force ${GIT_CACHE_PATH}/*.lock"
                             }
                         }
                         stage("init") {
                             when {
-                                expression { return !fileExists("src/brave/package.json") || RUN_INIT }
+                                expression { !SKIP_INIT }
                             }
                             steps {
+                                powershell "Remove-Item -Recurse -Force vendor/depot_tools/win_tools-*"
                                 powershell "npm run init"
-                            }
-                        }
-                        stage("sync") {
-                            steps {
-                                powershell "npm run sync -- --all"
                             }
                         }
                         stage("lint") {
